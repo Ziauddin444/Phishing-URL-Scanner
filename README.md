@@ -1,21 +1,27 @@
 # Phishing URL Scanner
 
-A Flask-based RESTful API for detecting phishing URLs using machine learning and heuristic analysis. This project achieves **94.5% detection accuracy** by combining Random Forest and Support Vector Machine (SVM) models with intelligent URL feature extraction.
+A Flask-based application for detecting phishing URLs using machine learning and heuristic analysis. This project achieves **94.5% detection accuracy** by combining Random Forest and Support Vector Machine (SVM) models with intelligent URL feature extraction.
+
+**Features a beautiful web dashboard with real-time phishing detection, batch scanning, and visual results!**
 
 ## 🎯 Project Overview
 
 This application analyzes URLs to determine whether they are legitimate or phishing attempts. It uses two complementary approaches:
 
-1. **Heuristic Analysis**: Examines URL structure for suspicious patterns
+1. **Heuristic Analysis**: Examines URL structure for suspicious patterns (22 intelligent features)
 2. **Machine Learning Ensemble**: Combines Random Forest and SVM predictions for robust classification
+3. **Web Dashboard**: Beautiful UI for easy-to-use phishing detection
 
 ## 🌟 Key Features
 
-- ✅ **Dual ML Models**: Random Forest + SVM ensemble for high accuracy
+- ✅ **Beautiful Web Dashboard**: User-friendly interface for scanning URLs
+- ✅ **Single & Batch Scanning**: Scan one URL or multiple URLs at once
+- ✅ **Dual ML Models**: Random Forest + SVM ensemble for high accuracy (94.5%)
 - ✅ **22 URL Features**: Sophisticated heuristic feature extraction
-- ✅ **RESTful API**: Easy-to-use Flask API endpoints
-- ✅ **Batch Processing**: Scan multiple URLs at once
-- ✅ **Feature Visualization**: Understand why URLs are flagged
+- ✅ **Visual Results**: Green for legitimate, Red for phishing
+- ✅ **Real-time Analysis**: Instant predictions with confidence scores
+- ✅ **Feature Visualization**: See top features influencing the decision
+- ✅ **RESTful API**: Programmatic access to predictions
 - ✅ **Production Ready**: Error handling, input validation, CORS support
 
 ## 📊 Technical Architecture
@@ -46,7 +52,41 @@ Phishing URL Scanner
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### ⚡ Fastest Way (Dashboard UI) - RECOMMENDED
+
+**STEP 1: START THE SERVER**
+```bash
+cd "Documents/GitHub/Phishing URL Scanner"
+source venv/bin/activate
+python src/app.py
+```
+
+**STEP 2: OPEN THE DASHBOARD**
+Open your browser and go to:
+```
+http://localhost:3000
+```
+
+**That's it!** 🎉 You now have a beautiful web interface to scan URLs.
+
+---
+
+### 📊 Dashboard Features
+
+The dashboard provides:
+- ✅ **Single URL Scanner** - Scan one URL at a time with instant results
+- ✅ **Batch Scanner** - Scan multiple URLs in one go
+- ✅ **Visual Results** - Green for legitimate, Red for phishing
+- ✅ **Confidence Scores** - Percentage confidence with progress bars
+- ✅ **Feature Analysis** - See top contributing features
+- ✅ **Model Comparison** - Compare RF vs SVM predictions
+- ✅ **Statistics Tab** - View model details and all 22 features
+
+### Manual Setup (for developers)
+
+If you prefer to set up manually:
+
+**1. Installation**
 
 ```bash
 # Clone or download the project
@@ -60,7 +100,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Train Models
+**2. Train Models** (if needed)
 
 ```bash
 # Train the ML models (uses sample data provided)
@@ -74,23 +114,72 @@ SVM Accuracy:            0.9400 (94.00%)
 Ensemble Accuracy:       0.9500 (95.00%)
 ```
 
-### 3. Run Flask API
+**3. Run Flask API**
 
 ```bash
 # Start the API server
 python src/app.py
 ```
 
-Server runs on: `http://localhost:5000`
+Server runs on: `http://localhost:3000`
 
-### 4. Test the API
+**4. Use the Dashboard or API**
 
-```bash
-# In another terminal
-python test_api.py
+- Dashboard: http://localhost:3000
+- API Health: curl http://localhost:3000/api/health
+
+## 🎨 Dashboard Usage Guide
+
+### Single URL Scanner
+1. Click the **"🔗 Single URL"** tab
+2. Enter a URL: `https://example.com`
+3. Press Enter or click **"Scan URL"**
+4. See instant results:
+   - ✅ **LEGITIMATE** or ❌ **PHISHING**
+   - Confidence percentage (0-100%)
+   - Model predictions comparison
+   - Top contributing features
+
+### Batch URL Scanner
+1. Click the **"📦 Batch Scan"** tab
+2. Click **"+ Add URL"** for each URL you want to scan
+3. Enter URLs in each field
+4. Click **"Scan All"** to analyze all at once
+5. View results with statistics:
+   - Total URLs scanned
+   - Count of legitimate URLs
+   - Count of phishing URLs
+
+### Statistics View
+1. Click the **"📈 Statistics"** tab
+2. View:
+   - Random Forest model (100 trees, max_depth=20)
+   - SVM model (RBF kernel)
+   - Total features (22)
+   - All features list
+
+### 🧪 Example URLs to Test
+
+**Legitimate URLs** (Should show ✅ GREEN):
+```
+https://google.com
+https://github.com
+https://facebook.com
+https://amazon.com
 ```
 
+**Phishing URLs** (Should show ❌ RED):
+```
+https://paypa1.com       (looks like paypal - '1' instead of 'l')
+https://goog1e.com       (looks like google - '1' instead of 'l')
+https://amaz0n-verify.com (looks like amazon with '0')
+```
+
+---
+
 ## 📡 API Endpoints
+
+**Note:** All API endpoints are also accessible directly if you prefer to use them programmatically.
 
 ### Health Check
 ```
@@ -320,15 +409,21 @@ python test_api.py
 
 ### Manual Testing with cURL
 ```bash
+# Test health check
+curl http://localhost:3000/api/health
+
 # Test single URL
-curl -X POST http://localhost:5000/api/predict \
+curl -X POST http://localhost:3000/api/predict \
   -H "Content-Type: application/json" \
   -d '{"url": "https://google.com"}'
 
 # Test batch
-curl -X POST http://localhost:5000/api/predict-batch \
+curl -X POST http://localhost:3000/api/predict-batch \
   -H "Content-Type: application/json" \
   -d '{"urls": ["https://google.com", "https://phishing.com"]}'
+
+# Get model stats
+curl http://localhost:3000/api/stats
 ```
 
 ## 🛡️ Security Considerations
@@ -353,14 +448,25 @@ curl -X POST http://localhost:5000/api/predict-batch \
 
 ## 🚀 Deployment
 
-### Local Deployment
+### Local Deployment (With Dashboard)
 ```bash
-python src/app.py  # Development server
+cd "Documents/GitHub/Phishing URL Scanner"
+source venv/bin/activate
+python src/app.py
+
+# Then open: http://localhost:3000
+```
+
+### Local Deployment (API Only)
+```bash
+python src/app.py  # Development server on port 3000
 ```
 
 ### Production Deployment (Gunicorn)
 ```bash
 gunicorn -w 4 -b 0.0.0.0:5000 src.app:app
+
+# Then open: http://your-server:5000
 ```
 
 ### Docker (Optional)
@@ -415,14 +521,62 @@ urls = ['https://google.com', 'https://phishing.com']
 results = predictor.batch_predict(urls)
 ```
 
+## 🆘 Troubleshooting
+
+### Dashboard Won't Load
+**Problem:** Dashboard shows blank page or "Cannot connect to API"
+- ✅ Make sure terminal with `python src/app.py` is still running
+- ✅ Wait 2-3 seconds and refresh browser (Cmd+R or Ctrl+R)
+- ✅ Check browser console for errors (F12)
+- ✅ Verify no other process is using port 3000
+
+### Port 3000 Already in Use
+**Problem:** "Address already in use"
+```bash
+# Kill process using port 3000
+lsof -i :3000 | grep LISTEN | awk '{print $2}' | xargs kill -9
+
+# Restart server
+python src/app.py
+```
+
+### Models Not Loading
+**Problem:** "Models not found" error
+- ✅ Check models exist: `ls models/`
+- ✅ Should show:
+  - `random_forest_model.joblib`
+  - `svm_model.joblib`
+  - `feature_scaler.joblib`
+- ✅ If missing, run: `python train_models.py`
+
+### Virtual Environment Issues
+**Problem:** "No module named 'flask'" or similar
+```bash
+# Make sure venv is activated (shows (venv) in prompt)
+source venv/bin/activate
+
+# Install dependencies again
+pip install -r requirements.txt
+```
+
+### Slow Predictions
+**Problem:** URLs taking >5 seconds to predict
+- ✅ This is normal on first run (model loading)
+- ✅ Network requests for redirect checking add 2-3 seconds
+- ✅ Subsequent predictions are faster
+- ✅ Batch processing is optimized for multiple URLs
+
 ## 🤝 Contributing
 
 Suggestions for improvements:
 - Add more URL features (WHOIS age, SSL cert validation)
 - Implement deep learning models (LSTM, CNN)
 - Add caching for repeated URLs
-- Build web UI dashboard
 - Add URL reputation APIs (VirusTotal integration)
+- Create mobile app
+- Add database for audit logs
+- Add user authentication for dashboard
+- Export results to CSV/PDF
 
 ## 📄 License
 
