@@ -1,0 +1,78 @@
+# 🎯 DASHBOARD - HOW TO RUN (SIMPLE VERSION)
+
+## ✅ CURRENT STATUS
+The server IS RUNNING RIGHT NOW at http://localhost:3000 ✨
+
+---
+
+## 🎮 HOW TO USE
+
+### **STEP 1: Keep Terminal Open**
+Make sure the terminal with the server is **STILL RUNNING**
+- Should show: `Running on http://127.0.0.1:3000`
+- DON'T close the terminal
+
+### **STEP 2: Open Browser**
+Click on your browser and go to:
+```
+http://localhost:3000
+```
+
+### **STEP 3: Scan URLs!**
+
+**Option A - Single URL:**
+1. Top tab: Click "🔗 Single URL"
+2. Type: `https://google.com`
+3. Press Enter or click "Scan URL"
+4. See result!
+
+**Option B - Multiple URLs:**
+1. Click "📦 Batch Scan"
+2. Click "+ Add URL" multiple times
+3. Type different URLs
+4. Click "Scan All"
+5. See all results
+
+**Option C - View Stats:**
+1. Click "📈 Statistics"
+2. See model information
+
+---
+
+## 📝 TEST THESE URLs
+
+**Green (✅ LEGITIMATE):**
+- google.com
+- github.com
+- facebook.com
+
+**Red (❌ PHISHING):**
+- paypa1.com (looks like paypal)
+- goog1e.com (looks like google, but 'le' is '1e')
+
+---
+
+## ❌ IF IT DOESN'T WORK
+
+**Error: "Cannot connect to API"**
+→ Make sure terminal still shows: `Running on http://127.0.0.1:3000`
+
+**Error: "Page won't load"**
+→ Wait 2 seconds, then refresh (Cmd+R)
+
+**Error: "Models not found"**
+→ The models are already in the `models/` folder
+
+---
+
+## 🎯 YOU SHOULD SEE
+
+✅ Beautiful dashboard with tabs
+✅ Input field for URLs
+✅ Green/Red results
+✅ Confidence percentage
+✅ Feature analysis
+
+---
+
+**That's it! Go to http://localhost:3000 and enjoy!** 🎉

@@ -17,7 +17,7 @@ class URLHeuristicAnalyzer:
     These features are used for ML model prediction
     """
     
-    def __init__(self, timeout=10):
+    def __init__(self, timeout=3):
         self.timeout = timeout
         
     def analyze_url(self, url):
@@ -159,9 +159,19 @@ class URLHeuristicAnalyzer:
     def _check_for_redirect(self, url):
         """Check if URL redirects (returns different URL)"""
         try:
-            response = requests.head(url, timeout=self.timeout, allow_redirects=False)
+            # Skip network checks for URLs that don't start with http
+            if not url.startswith(('http://', 'https://')):
+                return 0
+            
+            response = requests.head(
+                url, 
+                timeout=self.timeout, 
+                allow_redirects=False,
+                verify=False
+            )
             return 1 if response.status_code in [301, 302, 303, 307, 308] else 0
-        except:
+        except (requests.Timeout, requests.ConnectionError, requests.RequestException, Exception):
+            # On timeout or connection error, default to 0 (no redirect detected)
             return 0
     
     def get_feature_names(self):

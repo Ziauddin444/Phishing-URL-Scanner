@@ -2,7 +2,7 @@
 Flask REST API for Phishing URL Scanner
 Provides endpoints for URL prediction and batch scanning
 """
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import os
 import sys
@@ -22,6 +22,9 @@ CORS(app)
 env = os.environ.get('FLASK_ENV', 'development')
 config_class = config.get(env, Config)
 
+# Apply config to Flask app
+app.config.from_object(config_class)
+
 # Initialize predictor with Config class, not Flask config
 try:
     predictor = URLPredictor(config_class)
@@ -30,6 +33,15 @@ except Exception as e:
     predictor = None
 
 analyzer = URLHeuristicAnalyzer()
+
+# ============= DASHBOARD =============
+@app.route('/', methods=['GET'])
+def dashboard():
+    """Serve the dashboard"""
+    dashboard_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dashboard.html')
+    if os.path.exists(dashboard_path):
+        return send_file(dashboard_path)
+    return jsonify({'error': 'Dashboard not found'}), 404
 
 # ============= HEALTH CHECK =============
 @app.route('/api/health', methods=['GET'])
