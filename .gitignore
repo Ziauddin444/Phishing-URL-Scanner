@@ -1,18 +1,82 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
 env/
 venv/
-*.egg-info/
-dist/
-build/
-.DS_Store
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.venv
+
+# Environment Variables
 .env
-*.pkl
-*.joblib
+.env.local
+.env.*.local
+.env.production
+
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
 *.log
+logs/
+*.pot
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Models and Data (optional - comment out if you want to include sample models)
+# models/
+# data/
+
+# Temporary Files
+*.tmp
+*.bak
+*.backup
+temp/
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project Specific
 PUS/
+notebooks/
+*.pkl
+.idea/
+.vscode/
+
