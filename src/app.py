@@ -10,7 +10,7 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import Config, config
+from config import Config, config, ProductionConfig
 from src.predictor import URLPredictor
 from src.heuristic_analyzer import URLHeuristicAnalyzer
 
@@ -18,12 +18,23 @@ from src.heuristic_analyzer import URLHeuristicAnalyzer
 app = Flask(__name__)
 CORS(app)
 
-# Load config
-env = os.environ.get('FLASK_ENV', 'development')
-config_class = config.get(env, Config)
+# Load config - DEFAULT TO PRODUCTION SAFETY
+env = os.environ.get('FLASK_ENV', 'production')
+if env not in config:
+    print(f"Warning: Unknown FLASK_ENV '{env}', using production config")
+    env = 'production'
+config_class = config.get(env, ProductionConfig)
+
+# SECURITY: Ensure DEBUG is never True in production
+if env == 'production' and config_class.DEBUG:
+    print("ERROR: DEBUG must be False in production!")
+    config_class.DEBUG = False
 
 # Apply config to Flask app
 app.config.from_object(config_class)
+
+# Log configuration
+print(f"Loaded config: {env} (DEBUG={app.config['DEBUG']})")
 
 # Initialize predictor with Config class, not Flask config
 try:

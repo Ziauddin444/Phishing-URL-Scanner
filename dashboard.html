@@ -667,11 +667,11 @@
                     <h4>Top Contributing Features</h4>
                     ${topFeatures.map(([name, score]) => `
                         <div class="feature-bar">
-                            <div class="feature-bar-label">${name}</div>
+                            <div class="feature-bar-label">${escapeHtml(name)}</div>
                             <div class="feature-bar-container">
-                                <div class="feature-bar-fill" style="width: ${Math.min(score * 100, 100)}%"></div>
+                                <div class="feature-bar-fill" style="width: ${Math.min(Math.max(0, score) * 100, 100)}%"></div>
                             </div>
-                            <div class="feature-bar-value">${(score * 100).toFixed(1)}%</div>
+                            <div class="feature-bar-value">${(Math.max(0, score) * 100).toFixed(1)}%</div>
                         </div>
                     `).join('')}
                 </div>
@@ -682,17 +682,17 @@
                     <div class="result-header">
                         <div>
                             <div class="url-text">🔗 ${escapeHtml(data.url)}</div>
-                            <span class="prediction-badge ${badgeClass}">${data.prediction}</span>
+                            <span class="prediction-badge ${badgeClass}">${escapeHtml(data.prediction)}</span>
                         </div>
                     </div>
                     
                     <div class="confidence ${confidenceClass}">
-                        ${data.confidence_percentage}% Confidence
+                        ${Math.max(0, Math.min(100, data.confidence_percentage))}% Confidence
                     </div>
                     
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${data.confidence_percentage}%">
-                            ${data.confidence_percentage.toFixed(1)}%
+                        <div class="progress-fill" style="width: ${Math.max(0, Math.min(100, data.confidence_percentage))}%">
+                            ${Math.max(0, Math.min(100, data.confidence_percentage)).toFixed(1)}%
                         </div>
                     </div>
 
@@ -700,15 +700,15 @@
                         <div class="model-card">
                             <div class="model-name">🌲 Random Forest</div>
                             <div class="model-prediction">
-                                <span>${data.models.random_forest.prediction}</span>
-                                <span style="color: #667eea; font-weight: 600;">${(data.models.random_forest.confidence * 100).toFixed(1)}%</span>
+                                <span>${escapeHtml(data.models.random_forest.prediction)}</span>
+                                <span style="color: #667eea; font-weight: 600;">${(Math.max(0, Math.min(1, data.models.random_forest.confidence)) * 100).toFixed(1)}%</span>
                             </div>
                         </div>
                         <div class="model-card">
                             <div class="model-name">🎯 SVM</div>
                             <div class="model-prediction">
-                                <span>${data.models.svm.prediction}</span>
-                                <span style="color: #667eea; font-weight: 600;">${(data.models.svm.confidence * 100).toFixed(1)}%</span>
+                                <span>${escapeHtml(data.models.svm.prediction)}</span>
+                                <span style="color: #667eea; font-weight: 600;">${(Math.max(0, Math.min(1, data.models.svm.confidence)) * 100).toFixed(1)}%</span>
                             </div>
                         </div>
                     </div>
@@ -781,15 +781,15 @@
             let html = `
                 <div style="margin-bottom: 20px;">
                     <div class="stat-box">
-                        <span class="stat-number">${results.length}</span>
+                        <span class="stat-number">${Math.max(0, results.length)}</span>
                         <div class="stat-label">Total URLs Scanned</div>
                     </div>
                     <div class="stat-box" style="color: #50c878;">
-                        <span class="stat-number" style="color: #50c878;">${legitimateCount}</span>
+                        <span class="stat-number" style="color: #50c878;">${Math.max(0, legitimateCount)}</span>
                         <div class="stat-label">Legitimate</div>
                     </div>
                     <div class="stat-box" style="color: #ff6b6b;">
-                        <span class="stat-number" style="color: #ff6b6b;">${phishingCount}</span>
+                        <span class="stat-number" style="color: #ff6b6b;">${Math.max(0, phishingCount)}</span>
                         <div class="stat-label">Phishing</div>
                     </div>
                 </div>
@@ -801,15 +801,16 @@
                 const isPhishing = result.prediction === 'PHISHING';
                 const className = isPhishing ? 'result-phishing' : 'result-legitimate';
                 const badgeClass = isPhishing ? 'badge-phishing' : 'badge-legitimate';
+                const confidence = Math.max(0, Math.min(100, result.confidence_percentage));
 
                 html += `
                     <div class="result-card ${className}">
                         <div style="margin-bottom: 10px;">
                             <div class="url-text" style="font-size: 0.9em;">🔗 ${escapeHtml(result.url)}</div>
-                            <span class="prediction-badge ${badgeClass}" style="display: inline-block;">${result.prediction}</span>
+                            <span class="prediction-badge ${badgeClass}" style="display: inline-block;">${escapeHtml(result.prediction)}</span>
                         </div>
                         <div style="font-size: 1.2em; font-weight: 700; color: ${isPhishing ? '#ff6b6b' : '#50c878'};">
-                            ${result.confidence_percentage}%
+                            ${confidence}%
                         </div>
                     </div>
                 `;
