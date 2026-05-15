@@ -66,41 +66,51 @@ def health_check():
     })
 
 # ============= SINGLE URL PREDICTION =============
+def _validate_json_field(data, field_name, required=True):
+    """DRY: Validate JSON request fields"""
+    if not data:
+        return None, error_response(f'Invalid JSON body', 400)
+    if field_name not in data:
+        return None, error_response(f'Missing "{field_name}" in request body', 400)
+    return data[field_name], None
+
+def _normalize_url(url):
+    """DRY: Add protocol and clean URLs"""
+    if isinstance(url, str):
+        url = url.strip()
+    if not url:
+        return None
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    return url
+
 @app.route('/api/predict', methods=['POST'])
 def predict_url():
     """
     Predict if a single URL is phishing or legitimate
     
     POST /api/predict
-    {
-        "url": "https://example.com"
-    }
+    {"url": "https://example.com"}
     """
     if not predictor:
-        return jsonify({'error': 'Models not loaded'}), 500
+        return error_response('Models not loaded', 500)
     
-    data = request.get_json()
+    url, err = _validate_json_field(request.get_json(), 'url')
+    if err:
+        return err
     
-    if not data or 'url' not in data:
-        return jsonify({'error': 'Missing "url" in request body'}), 400
-    
-    url = data['url'].strip()
-    
+    url = _normalize_url(url)
     if not url:
-        return jsonify({'error': 'URL cannot be empty'}), 400
+        return error_response('URL cannot be empty', 400)
     
     if len(url) > app.config['MAX_URL_LENGTH']:
-        return jsonify({'error': f'URL too long (max {app.config["MAX_URL_LENGTH"]} chars)'}), 400
-    
-    # Add protocol if missing
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url
+        return error_response(f'URL too long (max {app.config["MAX_URL_LENGTH"]} chars)', 400)
     
     try:
         result = predictor.predict(url)
         return jsonify(result), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 400)
 
 # ============= BATCH PREDICTION =============
 @app.route('/api/predict-batch', methods=['POST'])
@@ -109,34 +119,26 @@ def predict_batch():
     Predict multiple URLs at once
     
     POST /api/predict-batch
-    {
-        "urls": ["url1.com", "url2.com"]
-    }
+    {"urls": ["url1.com", "url2.com"]}
     """
     if not predictor:
-        return jsonify({'error': 'Models not loaded'}), 500
+        return error_response('Models not loaded', 500)
     
-    data = request.get_json()
-    
-    if not data or 'urls' not in data:
-        return jsonify({'error': 'Missing "urls" in request body'}), 400
-    
-    urls = data['urls']
+    urls, err = _validate_json_field(request.get_json(), 'urls')
+    if err:
+        return err
     
     if not isinstance(urls, list):
-        return jsonify({'error': '"urls" must be a list'}), 400
+        return error_response('"urls" must be a list', 400)
     
     if len(urls) == 0:
-        return jsonify({'error': 'URLs list cannot be empty'}), 400
+        return error_response('URLs list cannot be empty', 400)
     
     if len(urls) > 100:
-        return jsonify({'error': 'Maximum 100 URLs per request'}), 400
+        return error_response('Maximum 100 URLs per request', 400)
     
-    # Add protocol to URLs if missing
-    urls = [
-        url if url.startswith(('http://', 'https://')) else 'https://' + url 
-        for url in urls
-    ]
+    # Normalize all URLs (DRY principle)
+    urls = [_normalize_url(url) for url in urls]
     
     try:
         results = predictor.batch_predict(urls)
@@ -145,7 +147,7 @@ def predict_batch():
             'results': results
         }), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 400)
 
 # ============= FEATURE EXTRACTION ONLY =============
 @app.route('/api/features', methods=['POST'])
@@ -154,19 +156,15 @@ def extract_features():
     Extract heuristic features from a URL without prediction
     
     POST /api/features
-    {
-        "url": "https://example.com"
-    }
+    {"url": "https://example.com"}
     """
-    data = request.get_json()
+    url, err = _validate_json_field(request.get_json(), 'url')
+    if err:
+        return err
     
-    if not data or 'url' not in data:
-        return jsonify({'error': 'Missing "url" in request body'}), 400
-    
-    url = data['url'].strip()
-    
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url
+    url = _normalize_url(url)
+    if not url:
+        return error_response('URL cannot be empty', 400)
     
     try:
         features = analyzer.analyze_url(url)
@@ -176,7 +174,7 @@ def extract_features():
             'feature_names': analyzer.get_feature_names()
         }), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 400)
 
 # ============= MODEL STATISTICS =============
 @app.route('/api/stats', methods=['GET'])
@@ -201,18 +199,22 @@ def get_stats():
         'ensemble_method': 'Average probability of RF and SVM'
     }), 200
 
+# ============= UTILITY FUNCTIONS =============
+def error_response(message, status_code):
+    """DRY: Create consistent error responses"""
+    return jsonify({'error': message}), status_code
+
 # ============= ERROR HANDLERS =============
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Endpoint not found'}), 404
+_ERROR_HANDLERS = {
+    404: ('Endpoint not found', 404),
+    500: ('Internal server error', 500),
+    405: ('Method not allowed', 405),
+}
 
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
-
-@app.errorhandler(405)
-def method_not_allowed(error):
-    return jsonify({'error': 'Method not allowed'}), 405
+for error_code, (message, status_code) in _ERROR_HANDLERS.items():
+    @app.errorhandler(error_code)
+    def handle_error(error, msg=message, code=status_code):
+        return error_response(msg, code)
 
 if __name__ == '__main__':
     app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=3000)

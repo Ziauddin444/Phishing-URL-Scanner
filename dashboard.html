@@ -821,22 +821,24 @@
         }
 
         // Utility functions
+        function clearResult(resultElementId, inputElementId = null) {
+            """DRY: Generic clear function"""
+            if (inputElementId) {
+                const elem = document.getElementById(inputElementId);
+                if (elem) elem.value = '';
+            }
+            const resultElem = document.getElementById(resultElementId);
+            if (resultElem) resultElem.innerHTML = '';
+        }
+
         function clearSingleResult() {
-            document.getElementById('singleUrl').value = '';
-            document.getElementById('singleResult').innerHTML = '';
+            clearResult('singleResult', 'singleUrl');
         }
 
-        function showLoading(elementId) {
-            document.getElementById(elementId).innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Analyzing URL...</p>
-                </div>
-            `;
-        }
-
-        function showError(elementId, message) {
-            document.getElementById(elementId).innerHTML = `<div class="error">❌ ${escapeHtml(message)}</div>`;
+        function clearBatchURLs() {
+            document.getElementById('urlList').innerHTML = '';
+            addURLField();
+            clearResult('batchResult');
         }
 
         function escapeHtml(text) {

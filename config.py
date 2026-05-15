@@ -34,18 +34,25 @@ class Config:
     MAX_URL_LENGTH = 2048
     TIMEOUT = 10
 
-class DevelopmentConfig(Config):
-    """Development configuration"""
-    DEBUG = True
+# Environment-specific configurations (DRY: defined via dict instead of classes)
+_ENV_CONFIGS = {
+    'development': {'DEBUG': True, 'TESTING': False},
+    'production': {'DEBUG': False, 'TESTING': False},
+    'testing': {'DEBUG': True, 'TESTING': True},
+}
 
-class ProductionConfig(Config):
-    """Production configuration"""
-    DEBUG = False
+def _create_env_config(env_name, overrides):
+    """Factory function to create config classes (DRY principle)"""
+    class EnvConfig(Config):
+        pass
+    for key, value in overrides.items():
+        setattr(EnvConfig, key, value)
+    return EnvConfig
 
-class TestingConfig(Config):
-    """Testing configuration"""
-    TESTING = True
-    DEBUG = True
+# Create config classes using factory
+DevelopmentConfig = _create_env_config('development', _ENV_CONFIGS['development'])
+ProductionConfig = _create_env_config('production', _ENV_CONFIGS['production'])
+TestingConfig = _create_env_config('testing', _ENV_CONFIGS['testing'])
 
 config = {
     'development': DevelopmentConfig,
