@@ -116,8 +116,18 @@ def _create_env_config(env_name, overrides):
 
 # Create config classes using factory
 DevelopmentConfig = _create_env_config('development', _ENV_CONFIGS['development'])
-ProductionConfig = _create_env_config('production', _ENV_CONFIGS['production'])
 TestingConfig = _create_env_config('testing', _ENV_CONFIGS['testing'])
+
+# Create ProductionConfig with error handling during import
+try:
+    ProductionConfig = _create_env_config('production', _ENV_CONFIGS['production'])
+except ValueError:
+    # If production config fails during import, create a placeholder
+    # that will fail at app startup (see app.py for enforcement)
+    class ProductionConfig(Config):
+        DEBUG = False
+        TESTING = False
+        SECRET_KEY = None  # Will be validated at app startup
 
 config = {
     'development': DevelopmentConfig,
