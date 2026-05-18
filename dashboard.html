@@ -609,8 +609,51 @@
         const API_BASE = 'http://localhost:3000/api';
         let urlCount = 1;
 
-        // Tab switching
-        function switchTab(tabName) {
+        // ============= SECURITY: INPUT SANITIZATION =============
+        function escapeHtml(text) {
+            """SECURITY: Escape HTML special characters to prevent XSS"""
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function sanitizeUrl(url) {
+            """SECURITY: Validate and sanitize URLs"""
+            // Basic URL validation
+            if (!url || typeof url !== 'string') return null;
+            
+            url = url.trim();
+            if (url.length > 2048) return null;  // Enforce max length
+            
+            // Allow only http(s) and common protocols
+            if (!/^(https?:\/\/)|(ftp:\/\/)|(file:\/\/)/.test(url)) {
+                url = 'https://' + url;
+            }
+            
+            return escapeHtml(url);
+        }
+
+        function validateNumberInput(value, min = 0, max = 100) {
+            """SECURITY: Validate numeric input is within safe bounds"""
+            const num = parseFloat(value);
+            return !isNaN(num) ? Math.max(min, Math.min(max, num)) : min;
+        }
+
+        // ============= UI UTILITIES =============
+        function createElement(tag, content, className = '') {
+            """SECURITY: Safely create DOM elements with proper escaping"""
+            const el = document.createElement(tag);
+            if (className) el.className = className;
+            if (content && typeof content === 'string') {
+                el.textContent = content;
+            }
+            return el;
+        }
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
