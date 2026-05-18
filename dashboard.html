@@ -609,9 +609,17 @@
         const API_BASE = 'http://localhost:3000/api';
         let urlCount = 1;
 
-        // ============= SECURITY: INPUT SANITIZATION =============
+        // ============= SECURITY: COMPREHENSIVE XSS PREVENTION =============
+        
+        /**
+         * escapeHtml - Escape HTML special characters to prevent XSS injection
+         * SECURITY: All user-controlled content must pass through this function before rendering
+         * This prevents: <script> tags, event handlers, HTML injection
+         */
         function escapeHtml(text) {
-            """SECURITY: Escape HTML special characters to prevent XSS"""
+            if (typeof text !== 'string') {
+                return String(text);
+            }
             const map = {
                 '&': '&amp;',
                 '<': '&lt;',
@@ -619,41 +627,95 @@
                 '"': '&quot;',
                 "'": '&#039;'
             };
-            return String(text).replace(/[&<>"']/g, m => map[m]);
+            return text.replace(/[&<>"']/g, char => map[char]);
         }
 
+        /**
+         * validateApiResponse - Validate API response data before rendering
+         * SECURITY: Defense in depth - validates response structure and data types
+         */
+        function validateApiResponse(data) {
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid API response format');
+            }
+            // Ensure prediction is one of expected values
+            if (data.prediction && !['PHISHING', 'LEGITIMATE'].includes(data.prediction)) {
+                throw new Error('Invalid prediction value in response');
+            }
+            return true;
+        }
+
+        /**
+         * sanitizeUrl - Validate and sanitize URLs before rendering
+         * SECURITY: Prevents protocol injection attacks
+         */
         function sanitizeUrl(url) {
-            """SECURITY: Validate and sanitize URLs"""
-            // Basic URL validation
-            if (!url || typeof url !== 'string') return null;
+            if (!url || typeof url !== 'string') return '';
             
             url = url.trim();
-            if (url.length > 2048) return null;  // Enforce max length
+            if (url.length > 2048) {
+                return 'URL exceeds maximum length';
+            }
             
-            // Allow only http(s) and common protocols
-            if (!/^(https?:\/\/)|(ftp:\/\/)|(file:\/\/)/.test(url)) {
-                url = 'https://' + url;
+            // Enforce only safe protocols
+            const safeProtocols = ['http://', 'https://', 'ftp://'];
+            let isValidProtocol = safeProtocols.some(proto => url.startsWith(proto));
+            
+            if (!isValidProtocol) {
+                // Add https:// for URLs without protocol
+                if (!url.includes('://')) {
+                    url = 'https://' + url;
+                } else {
+                    // Reject URLs with unsafe protocols
+                    return 'Unsafe URL protocol detected';
+                }
             }
             
             return escapeHtml(url);
         }
 
+        /**
+         * validateNumberInput - Ensure numeric values are within safe bounds
+         * SECURITY: Prevents out-of-range values that could bypass validations
+         */
         function validateNumberInput(value, min = 0, max = 100) {
-            """SECURITY: Validate numeric input is within safe bounds"""
             const num = parseFloat(value);
-            return !isNaN(num) ? Math.max(min, Math.min(max, num)) : min;
+            if (isNaN(num)) return min;
+            return Math.max(min, Math.min(max, num));
         }
 
-        // ============= UI UTILITIES =============
+        /**
+         * createElement - Safely create DOM elements with textContent
+         * SECURITY: Uses textContent instead of innerHTML for user content
+         * This prevents HTML/script injection completely
+         */
         function createElement(tag, content, className = '') {
-            """SECURITY: Safely create DOM elements with proper escaping"""
             const el = document.createElement(tag);
-            if (className) el.className = className;
-            if (content && typeof content === 'string') {
-                el.textContent = content;
+            if (className) {
+                el.className = className;
+            }
+            if (content) {
+                // Use textContent instead of innerHTML for user-controlled content
+                el.textContent = escapeHtml(String(content));
             }
             return el;
         }
+
+        /**
+         * setTextContent - Safely set text content on an element
+         * SECURITY: Uses textContent instead of innerHTML
+         */
+        function setTextContent(element, text) {
+            if (element) {
+                element.textContent = escapeHtml(String(text));
+            }
+        }
+
+        /**
+         * switchTab - Switch between dashboard tabs
+         * SECURITY: No user content in tab switching, safe to use standard DOM methods
+         */
+        function switchTab(tabName) {
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
@@ -695,72 +757,131 @@
         // Display single result
         function displaySingleResult(data) {
             if (data.error) {
-                showError('singleResult', data.error);
+                showError('singleResult', escapeHtml(data.error));
                 return;
             }
 
-            const isPhishing = data.prediction === 'PHISHING';
-            const className = isPhishing ? 'result-phishing' : 'result-legitimate';
-            const badgeClass = isPhishing ? 'badge-phishing' : 'badge-legitimate';
-            const confidenceClass = isPhishing ? 'confidence-phishing' : 'confidence-legitimate';
+            try {
+                // SECURITY: Validate API response before rendering
+                validateApiResponse(data);
 
-            const topFeatures = data.top_features || [];
-            const featuresHTML = topFeatures.length > 0 ? `
-                <div class="top-features">
-                    <h4>Top Contributing Features</h4>
-                    ${topFeatures.map(([name, score]) => `
-                        <div class="feature-bar">
-                            <div class="feature-bar-label">${escapeHtml(name)}</div>
-                            <div class="feature-bar-container">
-                                <div class="feature-bar-fill" style="width: ${Math.min(Math.max(0, score) * 100, 100)}%"></div>
-                            </div>
-                            <div class="feature-bar-value">${(Math.max(0, score) * 100).toFixed(1)}%</div>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : '';
+                const isPhishing = data.prediction === 'PHISHING';
+                const className = isPhishing ? 'result-phishing' : 'result-legitimate';
+                const badgeClass = isPhishing ? 'badge-phishing' : 'badge-legitimate';
+                const confidenceClass = isPhishing ? 'confidence-phishing' : 'confidence-legitimate';
+                const confidence = validateNumberInput(data.confidence_percentage, 0, 100);
 
-            const html = `
-                <div class="result-card ${className}">
-                    <div class="result-header">
-                        <div>
-                            <div class="url-text">🔗 ${escapeHtml(data.url)}</div>
-                            <span class="prediction-badge ${badgeClass}">${escapeHtml(data.prediction)}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="confidence ${confidenceClass}">
-                        ${Math.max(0, Math.min(100, data.confidence_percentage))}% Confidence
-                    </div>
-                    
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.max(0, Math.min(100, data.confidence_percentage))}%">
-                            ${Math.max(0, Math.min(100, data.confidence_percentage)).toFixed(1)}%
-                        </div>
-                    </div>
+                // SECURITY: Create result container and populate with textContent where possible
+                const resultContainer = document.getElementById('singleResult');
+                resultContainer.innerHTML = ''; // Clear previous results
 
-                    <div class="models-comparison">
-                        <div class="model-card">
-                            <div class="model-name">🌲 Random Forest</div>
-                            <div class="model-prediction">
-                                <span>${escapeHtml(data.models.random_forest.prediction)}</span>
-                                <span style="color: #667eea; font-weight: 600;">${(Math.max(0, Math.min(1, data.models.random_forest.confidence)) * 100).toFixed(1)}%</span>
-                            </div>
-                        </div>
-                        <div class="model-card">
-                            <div class="model-name">🎯 SVM</div>
-                            <div class="model-prediction">
-                                <span>${escapeHtml(data.models.svm.prediction)}</span>
-                                <span style="color: #667eea; font-weight: 600;">${(Math.max(0, Math.min(1, data.models.svm.confidence)) * 100).toFixed(1)}%</span>
-                            </div>
-                        </div>
-                    </div>
+                const resultCard = document.createElement('div');
+                resultCard.className = `result-card ${className}`;
 
-                    ${featuresHTML}
-                </div>
-            `;
+                // URL display (SECURITY: escaped)
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'url-text';
+                urlDiv.textContent = '🔗 ' + escapeHtml(data.url);
 
-            document.getElementById('singleResult').innerHTML = html;
+                // Prediction badge (SECURITY: escaped)
+                const badge = document.createElement('span');
+                badge.className = `prediction-badge ${badgeClass}`;
+                badge.textContent = escapeHtml(data.prediction);
+
+                // Confidence percentage (numeric, safe)
+                const confidenceDiv = document.createElement('div');
+                confidenceDiv.className = `confidence ${confidenceClass}`;
+                confidenceDiv.textContent = confidence.toFixed(1) + '% Confidence';
+
+                // Progress bar (numeric values only, safe)
+                const progressBar = document.createElement('div');
+                progressBar.className = 'progress-bar';
+                const progressFill = document.createElement('div');
+                progressFill.className = 'progress-fill';
+                progressFill.style.width = confidence + '%';
+                progressFill.textContent = confidence.toFixed(1) + '%';
+                progressBar.appendChild(progressFill);
+
+                // Models comparison (SECURITY: all values escaped)
+                const modelsDiv = document.createElement('div');
+                modelsDiv.className = 'models-comparison';
+
+                // Random Forest model
+                const rfCard = document.createElement('div');
+                rfCard.className = 'model-card';
+                const rfName = document.createElement('div');
+                rfName.className = 'model-name';
+                rfName.textContent = '🌲 Random Forest';
+                const rfPred = document.createElement('div');
+                rfPred.className = 'model-prediction';
+                rfPred.innerHTML = `<span>${escapeHtml(data.models.random_forest.prediction)}</span>
+                                   <span style="color: #667eea; font-weight: 600;">${validateNumberInput(data.models.random_forest.confidence * 100, 0, 100).toFixed(1)}%</span>`;
+                rfCard.appendChild(rfName);
+                rfCard.appendChild(rfPred);
+                modelsDiv.appendChild(rfCard);
+
+                // SVM model
+                const svmCard = document.createElement('div');
+                svmCard.className = 'model-card';
+                const svmName = document.createElement('div');
+                svmName.className = 'model-name';
+                svmName.textContent = '🎯 SVM';
+                const svmPred = document.createElement('div');
+                svmPred.className = 'model-prediction';
+                svmPred.innerHTML = `<span>${escapeHtml(data.models.svm.prediction)}</span>
+                                    <span style="color: #667eea; font-weight: 600;">${validateNumberInput(data.models.svm.confidence * 100, 0, 100).toFixed(1)}%</span>`;
+                svmCard.appendChild(svmName);
+                svmCard.appendChild(svmPred);
+                modelsDiv.appendChild(svmCard);
+
+                // Top features (SECURITY: feature names and scores escaped)
+                const topFeatures = data.top_features || [];
+                const featuresDiv = document.createElement('div');
+                featuresDiv.className = 'top-features';
+                if (topFeatures.length > 0) {
+                    const title = document.createElement('h4');
+                    title.textContent = 'Top Contributing Features';
+                    featuresDiv.appendChild(title);
+
+                    topFeatures.forEach(([name, score]) => {
+                        const featureBar = document.createElement('div');
+                        featureBar.className = 'feature-bar';
+                        
+                        const label = document.createElement('div');
+                        label.className = 'feature-bar-label';
+                        label.textContent = escapeHtml(name);
+                        
+                        const barContainer = document.createElement('div');
+                        barContainer.className = 'feature-bar-container';
+                        const barFill = document.createElement('div');
+                        barFill.className = 'feature-bar-fill';
+                        const scorePercent = validateNumberInput(score * 100, 0, 100);
+                        barFill.style.width = scorePercent + '%';
+                        barContainer.appendChild(barFill);
+                        
+                        const barValue = document.createElement('div');
+                        barValue.className = 'feature-bar-value';
+                        barValue.textContent = scorePercent.toFixed(1) + '%';
+                        
+                        featureBar.appendChild(label);
+                        featureBar.appendChild(barContainer);
+                        featureBar.appendChild(barValue);
+                        featuresDiv.appendChild(featureBar);
+                    });
+                }
+
+                // Assemble result
+                resultCard.appendChild(urlDiv);
+                resultCard.appendChild(badge);
+                resultCard.appendChild(confidenceDiv);
+                resultCard.appendChild(progressBar);
+                resultCard.appendChild(modelsDiv);
+                resultCard.appendChild(featuresDiv);
+
+                resultContainer.appendChild(resultCard);
+            } catch (error) {
+                showError('singleResult', 'Error processing result: ' + escapeHtml(error.message));
+            }
         }
 
         // Batch functions
@@ -813,59 +934,117 @@
 
         function displayBatchResults(data) {
             if (data.error) {
-                showError('batchResult', data.error);
+                showError('batchResult', escapeHtml(data.error));
                 return;
             }
 
-            const results = data.results || [];
-            const phishingCount = results.filter(r => r.prediction === 'PHISHING').length;
-            const legitimateCount = results.filter(r => r.prediction === 'LEGITIMATE').length;
+            try {
+                const results = data.results || [];
+                const phishingCount = results.filter(r => r.prediction === 'PHISHING').length;
+                const legitimateCount = results.filter(r => r.prediction === 'LEGITIMATE').length;
 
-            let html = `
-                <div style="margin-bottom: 20px;">
-                    <div class="stat-box">
-                        <span class="stat-number">${Math.max(0, results.length)}</span>
-                        <div class="stat-label">Total URLs Scanned</div>
-                    </div>
-                    <div class="stat-box" style="color: #50c878;">
-                        <span class="stat-number" style="color: #50c878;">${Math.max(0, legitimateCount)}</span>
-                        <div class="stat-label">Legitimate</div>
-                    </div>
-                    <div class="stat-box" style="color: #ff6b6b;">
-                        <span class="stat-number" style="color: #ff6b6b;">${Math.max(0, phishingCount)}</span>
-                        <div class="stat-label">Phishing</div>
-                    </div>
-                </div>
+                const batchResultContainer = document.getElementById('batchResult');
+                batchResultContainer.innerHTML = '';
 
-                <div class="batch-results">
-            `;
+                // Statistics section
+                const statsDiv = document.createElement('div');
+                statsDiv.style.marginBottom = '20px';
 
-            results.forEach((result, index) => {
-                const isPhishing = result.prediction === 'PHISHING';
-                const className = isPhishing ? 'result-phishing' : 'result-legitimate';
-                const badgeClass = isPhishing ? 'badge-phishing' : 'badge-legitimate';
-                const confidence = Math.max(0, Math.min(100, result.confidence_percentage));
+                const totalBox = document.createElement('div');
+                totalBox.className = 'stat-box';
+                const totalNum = document.createElement('span');
+                totalNum.className = 'stat-number';
+                totalNum.textContent = Math.max(0, results.length);
+                const totalLabel = document.createElement('div');
+                totalLabel.className = 'stat-label';
+                totalLabel.textContent = 'Total URLs Scanned';
+                totalBox.appendChild(totalNum);
+                totalBox.appendChild(totalLabel);
+                statsDiv.appendChild(totalBox);
 
-                html += `
-                    <div class="result-card ${className}">
-                        <div style="margin-bottom: 10px;">
-                            <div class="url-text" style="font-size: 0.9em;">🔗 ${escapeHtml(result.url)}</div>
-                            <span class="prediction-badge ${badgeClass}" style="display: inline-block;">${escapeHtml(result.prediction)}</span>
-                        </div>
-                        <div style="font-size: 1.2em; font-weight: 700; color: ${isPhishing ? '#ff6b6b' : '#50c878'};">
-                            ${confidence}%
-                        </div>
-                    </div>
-                `;
-            });
+                const legitBox = document.createElement('div');
+                legitBox.className = 'stat-box';
+                legitBox.style.color = '#50c878';
+                const legitNum = document.createElement('span');
+                legitNum.className = 'stat-number';
+                legitNum.style.color = '#50c878';
+                legitNum.textContent = Math.max(0, legitimateCount);
+                const legitLabel = document.createElement('div');
+                legitLabel.className = 'stat-label';
+                legitLabel.textContent = 'Legitimate';
+                legitBox.appendChild(legitNum);
+                legitBox.appendChild(legitLabel);
+                statsDiv.appendChild(legitBox);
 
-            html += '</div>';
-            document.getElementById('batchResult').innerHTML = html;
+                const phishBox = document.createElement('div');
+                phishBox.className = 'stat-box';
+                phishBox.style.color = '#ff6b6b';
+                const phishNum = document.createElement('span');
+                phishNum.className = 'stat-number';
+                phishNum.style.color = '#ff6b6b';
+                phishNum.textContent = Math.max(0, phishingCount);
+                const phishLabel = document.createElement('div');
+                phishLabel.className = 'stat-label';
+                phishLabel.textContent = 'Phishing';
+                phishBox.appendChild(phishNum);
+                phishBox.appendChild(phishLabel);
+                statsDiv.appendChild(phishBox);
+
+                batchResultContainer.appendChild(statsDiv);
+
+                // Results list
+                const resultsList = document.createElement('div');
+                resultsList.className = 'batch-results';
+
+                results.forEach((result, index) => {
+                    try {
+                        validateApiResponse(result);
+                        const isPhishing = result.prediction === 'PHISHING';
+                        const className = isPhishing ? 'result-phishing' : 'result-legitimate';
+                        const badgeClass = isPhishing ? 'badge-phishing' : 'badge-legitimate';
+                        const confidence = validateNumberInput(result.confidence_percentage, 0, 100);
+
+                        const resultCard = document.createElement('div');
+                        resultCard.className = `result-card ${className}`;
+
+                        const urlDiv = document.createElement('div');
+                        urlDiv.style.marginBottom = '10px';
+                        
+                        const urlText = document.createElement('div');
+                        urlText.className = 'url-text';
+                        urlText.style.fontSize = '0.9em';
+                        urlText.textContent = '🔗 ' + escapeHtml(result.url);
+
+                        const badge = document.createElement('span');
+                        badge.className = `prediction-badge ${badgeClass}`;
+                        badge.style.display = 'inline-block';
+                        badge.textContent = escapeHtml(result.prediction);
+
+                        urlDiv.appendChild(urlText);
+                        urlDiv.appendChild(badge);
+
+                        const confDiv = document.createElement('div');
+                        confDiv.style.fontSize = '1.2em';
+                        confDiv.style.fontWeight = '700';
+                        confDiv.style.color = isPhishing ? '#ff6b6b' : '#50c878';
+                        confDiv.textContent = confidence.toFixed(1) + '%';
+
+                        resultCard.appendChild(urlDiv);
+                        resultCard.appendChild(confDiv);
+                        resultsList.appendChild(resultCard);
+                    } catch (error) {
+                        console.error('Error processing batch result:', error);
+                    }
+                });
+
+                batchResultContainer.appendChild(resultsList);
+            } catch (error) {
+                showError('batchResult', 'Error processing batch results: ' + escapeHtml(error.message));
+            }
         }
 
         // Utility functions
         function clearResult(resultElementId, inputElementId = null) {
-            """DRY: Generic clear function"""
             if (inputElementId) {
                 const elem = document.getElementById(inputElementId);
                 if (elem) elem.value = '';
@@ -884,15 +1063,36 @@
             clearResult('batchResult');
         }
 
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
+        function showError(elementId, message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.style.padding = '15px';
+            errorDiv.style.marginBottom = '15px';
+            errorDiv.style.backgroundColor = '#fee';
+            errorDiv.style.border = '1px solid #fcc';
+            errorDiv.style.borderRadius = '8px';
+            errorDiv.style.color = '#c00';
+            errorDiv.textContent = '⚠️ ' + escapeHtml(String(message));
+            
+            const container = document.getElementById(elementId);
+            if (container) {
+                container.innerHTML = '';
+                container.appendChild(errorDiv);
+            }
+        }
+
+        function showLoading(elementId) {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.style.padding = '20px';
+            loadingDiv.style.textAlign = 'center';
+            loadingDiv.style.color = '#667eea';
+            loadingDiv.innerHTML = '<p>🔄 Scanning...</p>';
+            
+            const container = document.getElementById(elementId);
+            if (container) {
+                container.innerHTML = '';
+                container.appendChild(loadingDiv);
+            }
         }
 
         // Initialize batch with one URL field
