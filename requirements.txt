@@ -10,7 +10,7 @@ Flask-CORS==6.0.5           # fixes CVE-2024-6866, CVE-2024-6844, CVE-2024-6839,
 scikit-learn==1.6.1         # fixes CVE-2024-5206 (TfidfVectorizer data leakage)
 pandas==2.2.3
 numpy==2.1.3
-python-whois==0.9.5
+python-whois==0.9.6
 requests==2.34.2            # fixes CVE-2024-47081 (.netrc leak), CVE-2026-25645 (tmpfile reuse)
 urllib3==2.7.0              # fixes CVE-2026-21441, CVE-2025-66471, CVE-2025-66418, CVE-2025-50181, + more
 tldextract==5.1.4

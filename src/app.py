@@ -56,8 +56,9 @@ app.config.from_object(config_class)
 # Log configuration — use logger, never print()
 logger.info("Loaded config: %s (DEBUG=%s)", env, app.config['DEBUG'])
 
+
 # ---------------------------------------------------------------------------
-# Security headers — applied to every response via after_request hook
+# Security headers - applied to every response via after_request hook
 # ---------------------------------------------------------------------------
 @app.after_request
 def set_security_headers(response):
@@ -87,6 +88,7 @@ except Exception as e:
     predictor = None
 
 analyzer = URLHeuristicAnalyzer()
+
 
 # ============= DASHBOARD =============
 @app.route('/', methods=['GET'])
