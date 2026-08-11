@@ -1,0 +1,60 @@
+name: Security and Tests
+
+on:
+  push:
+    branches: ["main", "master", "develop"]
+  pull_request:
+    branches: ["main", "master", "develop"]
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  security-audit:
+    name: Dependency Security Audit pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Run pip-audit against requirements.txt
+        run: pip-audit -r requirements.txt --desc --format columns
+
+  test:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests with coverage
+        env:
+          FLASK_ENV: testing
+          SECRET_KEY: ci-test-secret-key-not-used-in-production
+        run: pytest --cov=src --cov-report=term-missing -v
+
+  lint:
+    name: Code Quality flake8
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install flake8
+        run: pip install flake8
+      - name: Run flake8
+        run: flake8 src/ config.py --max-line-length=120 --ignore=E501,W503 --count --statistics

@@ -43,8 +43,11 @@ export FLASK_ENV=production
 export DEBUG=False
 export SECRET_KEY=very-long-random-secure-key
 
-# Use WSGI server (Gunicorn)
-gunicorn -w 4 -b 0.0.0.0:5000 src.app:app
+# Restrict CORS to your own domain(s)
+export CORS_ALLOWED_ORIGINS=https://yourdomain.com
+
+# Use WSGI server (Gunicorn 26+)
+gunicorn -w 4 -b 0.0.0.0:3000 "src.app:app"
 
 # Use HTTPS
 # Use reverse proxy (nginx)
@@ -63,14 +66,19 @@ gunicorn -w 4 -b 0.0.0.0:5000 src.app:app
   - Adding authentication
 
 ### 5. Dependency Security
-Keep dependencies up to date:
-```bash
-# Check for vulnerable dependencies
-pip audit
 
-# Update dependencies
+Dependencies are pinned to patched versions. Run the following locally before any release:
+
+```bash
+# Audit for known CVEs (replaces deprecated `pip audit`)
+pip-audit -r requirements.txt --desc
+
+# Or upgrade all pinned packages and re-audit
 pip install --upgrade -r requirements.txt
+pip-audit -r requirements.txt
 ```
+
+A `pip-audit` check also runs automatically in GitHub Actions on every push and pull request (see `.github/workflows/security.yml`).
 
 ## Security Features Implemented
 
@@ -90,23 +98,36 @@ pip install --upgrade -r requirements.txt
 - Secure defaults
 
 ✅ **CORS**
-- Configurable cross-origin requests
-- Prevents unauthorized access patterns
+- Origin allowlist driven by `CORS_ALLOWED_ORIGINS` environment variable
+- Private network access disabled (`allow_private_network=False`)
+- Credentials not forwarded when using wildcard origins
+
+✅ **HTTP Security Headers** (implemented via `@app.after_request`)
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Content-Security-Policy: default-src 'self'`
+- `Strict-Transport-Security` (when HTTPS / production)
+- `Server` fingerprinting header removed
 
 ✅ **API Security**
 - JSON input validation
 - Content-Type checking
 - Request size limits
+- Raw exception messages never exposed to API consumers
+
+✅ **CI/CD Security Gate**
+- `pip-audit` runs on every push and pull request (`.github/workflows/security.yml`)
+- Weekly scheduled scan catches newly-published CVEs against pinned versions
 
 ## Future Security Improvements
 
-- [ ] Rate limiting on API endpoints
-- [ ] API authentication/authorization
-- [ ] HTTPS enforcement
-- [ ] Security headers (CSP, HSTS)
+- [ ] Rate limiting on API endpoints (e.g., `flask-limiter`)
+- [ ] API authentication / API key support
+- [ ] HTTPS enforcement at the application layer
+- [ ] Audit logging (request source, URL scanned, result)
 - [ ] Input sanitization enhancements
-- [ ] Audit logging
-- [ ] Security testing in CI/CD
 
 ## Security Guidelines for Contributors
 

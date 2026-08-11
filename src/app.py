@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import os
 import sys
+import logging
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,9 +15,28 @@ from config import Config, config, ProductionConfig
 from src.predictor import URLPredictor
 from src.heuristic_analyzer import URLHeuristicAnalyzer
 
+# Configure logging (never use print() in production)
+logging.basicConfig(
+    level=getattr(logging, os.environ.get('LOG_LEVEL', 'INFO').upper(), logging.INFO),
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+)
+logger = logging.getLogger(__name__)
+
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
+
+# ---------------------------------------------------------------------------
+# CORS — hardened: read allowed origins from environment variable so no
+# secrets are ever hardcoded and the policy is easy to tighten in production.
+# Alert #8 fix: allow_private_network=False (disabled by default in 6.x)
+# ---------------------------------------------------------------------------
+_raw_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
+allowed_origins = [o.strip() for o in _raw_origins.split(',') if o.strip()]
+CORS(
+    app,
+    origins=allowed_origins,
+    supports_credentials=False,   # must be False when origins='*'
+)
 
 # Load config - DEFAULT TO PRODUCTION SAFETY
 env = os.environ.get('FLASK_ENV', 'production')
@@ -33,14 +53,37 @@ if env == 'production' and config_class.DEBUG:
 # Apply config to Flask app
 app.config.from_object(config_class)
 
-# Log configuration
-print(f"Loaded config: {env} (DEBUG={app.config['DEBUG']})")
+# Log configuration — use logger, never print()
+logger.info("Loaded config: %s (DEBUG=%s)", env, app.config['DEBUG'])
+
+# ---------------------------------------------------------------------------
+# Security headers — applied to every response via after_request hook
+# ---------------------------------------------------------------------------
+@app.after_request
+def set_security_headers(response):
+    """Attach hardened HTTP security headers to every outgoing response."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Restrict CSP; loosen only if you serve embedded assets
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    )
+    # Only send HSTS when actually running over HTTPS
+    if request.is_secure or os.environ.get('FLASK_ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = (
+            'max-age=31536000; includeSubDomains; preload'
+        )
+    # Remove server fingerprinting header
+    response.headers.pop('Server', None)
+    return response
 
 # Initialize predictor with Config class, not Flask config
 try:
     predictor = URLPredictor(config_class)
 except Exception as e:
-    print(f"Warning: Models not loaded. Train models first. Error: {e}")
+    logger.warning("Models not loaded. Train models first. Error: %s", e)
     predictor = None
 
 analyzer = URLHeuristicAnalyzer()
@@ -109,8 +152,13 @@ def predict_url():
     try:
         result = predictor.predict(url)
         return jsonify(result), 200
-    except Exception as e:
+    except ValueError as e:
+        logger.warning("Prediction ValueError for url=%s: %s", url, e)
         return error_response(str(e), 400)
+    except Exception as e:
+        logger.error("Unexpected prediction error: %s", e, exc_info=True)
+        # Never expose raw exception messages to API consumers
+        return error_response('An error occurred processing the URL', 500)
 
 # ============= BATCH PREDICTION =============
 @app.route('/api/predict-batch', methods=['POST'])
@@ -146,8 +194,12 @@ def predict_batch():
             'total': len(results),
             'results': results
         }), 200
-    except Exception as e:
+    except ValueError as e:
+        logger.warning("Batch prediction ValueError: %s", e)
         return error_response(str(e), 400)
+    except Exception as e:
+        logger.error("Unexpected batch prediction error: %s", e, exc_info=True)
+        return error_response('An error occurred processing the URLs', 500)
 
 # ============= FEATURE EXTRACTION ONLY =============
 @app.route('/api/features', methods=['POST'])
@@ -174,7 +226,8 @@ def extract_features():
             'feature_names': analyzer.get_feature_names()
         }), 200
     except Exception as e:
-        return error_response(str(e), 400)
+        logger.error("Feature extraction error: %s", e, exc_info=True)
+        return error_response('An error occurred extracting features', 500)
 
 # ============= MODEL STATISTICS =============
 @app.route('/api/stats', methods=['GET'])
@@ -217,4 +270,6 @@ for error_code, (message, status_code) in _ERROR_HANDLERS.items():
         return error_response(msg, code)
 
 if __name__ == '__main__':
+    # Development only — in production use gunicorn:
+    # gunicorn "src.app:app" -b 0.0.0.0:3000 --workers 4
     app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=3000)
